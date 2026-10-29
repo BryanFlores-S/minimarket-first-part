@@ -8,7 +8,7 @@ This application operates strictly on a traditional server-side rendering (SSR) 
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
 - **Traditional MVC Architecture**: Built using `@Controller` to render HTML templates on the server using Thymeleaf.
 - **Form-Based Product Management (CRUD)**: Create, read, update, and delete products using standard HTML forms and HTTP GET/POST redirects.
@@ -19,7 +19,7 @@ This application operates strictly on a traditional server-side rendering (SSR) 
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Backend
 - **Java 21**
@@ -36,7 +36,7 @@ This application operates strictly on a traditional server-side rendering (SSR) 
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 minimarket/
@@ -68,3 +68,13 @@ minimarket/
 │   └── test/
 ├── pom.xml
 └── README.md
+
+
+## Dockerization & Cloud Deployment (WEB-2)
+
+This section outlines the process used to containerize the Minimarket application using Docker, publish the image to Docker Hub, and deploy it onto an AWS EC2 instance alongside a PostgreSQL database and a companion service.
+
+### 1. Local Package Build
+Before building the container image, the application is packaged into an executable `.jar` file using Maven while skipping unit tests for efficiency:
+```bash
+./mvnw clean package -DskipTests
