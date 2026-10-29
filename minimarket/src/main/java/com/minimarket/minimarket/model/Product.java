@@ -23,7 +23,7 @@ public class Product {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    // Constructores
+    // Builders
     public Product() {
     }
 
