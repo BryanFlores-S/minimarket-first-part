@@ -8,6 +8,6 @@ import java.util.List;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
-    // Preparado para la barra de búsqueda de la siguiente fase:
+    // Ready for the search bar in the next phase:
     List<Product> findByNameContainingIgnoreCase(String name);
 }
