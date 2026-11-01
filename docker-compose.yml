@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # 1. API GATEWAY (Single Secure Entrypoint)
+  # Only this gateway exposes a port to the host/reverse-proxy.
+  api-gateway:
+    image: nginx:alpine
+    container_name: minimarket_gateway
+    restart: unless-stopped
+    ports:
+      # Configurable host port (defaults to 8082 to avoid conflicting with existing projects)
+      - "${GATEWAY_PORT:-8082}:80"
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - minimarket_net
+    depends_on:
+      - minimarket-app
+
+  # 2. SPRING BOOT APPLICATION (Zero ports exposed to the host/internet)
+  minimarket-app:
+    image: ${DOCKER_IMAGE:-minimarket:latest}
+    build:
+      context: ./minimarket
+    container_name: minimarket_app
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db-minimarket:5432/minimarket_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: admin12345
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"
+    networks:
+      - minimarket_net
+    depends_on:
+      - db-minimarket
+
+  # 3. POSTGRESQL DATABASE (Zero ports exposed to the host/internet)
+  db-minimarket:
+    image: postgres:16-alpine
+    container_name: minimarket_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: minimarket_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin12345
+    volumes:
+      - minimarket_pgdata:/var/lib/postgresql/data
+      # Automated database initialization using SQL dump downloaded from AWS S3
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - minimarket_net
+
+volumes:
+  minimarket_pgdata:
+
+networks:
+  minimarket_net:
+    driver: bridge
+

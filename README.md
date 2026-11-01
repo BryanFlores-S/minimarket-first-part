@@ -40,41 +40,72 @@ This application operates strictly on a traditional server-side rendering (SSR) 
 
 ```text
 minimarket/
-├── src/
-│   ├── main/
-│   │   ├── java/
-│   │   │   └── com/
-│   │   │       └── minimarket/
-│   │   │           └── minimarket/
-│   │   │               ├── MinimarketApplication.java
-│   │   │               ├── controller/
-│   │   │               │   └── ProductViewController.java
-│   │   │               ├── model/
-│   │   │               │   └── Product.java
-│   │   │               ├── repository/
-│   │   │               │   └── ProductRepository.java
-│   │   │               └── service/
-│   │   │                   └── ProductService.java
-│   │   └── resources/
-│   │       ├── static/
-│   │       │   ├── css/
-│   │       │   │   └── styles.css
-│   │       │   ├── js/
-│   │       │   │   └── app.js
-│   │       │   └── data_minimarket/
-│   │       ├── templates/
-│   │       │   └── index.html
-│   │       └── application.properties
-│   └── test/
-├── pom.xml
+├── gateway/
+│   └── nginx.conf
+├── minimarket/
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/
+│   │   │   │   └── com/minimarket/minimarket/
+│   │   │   │       ├── MinimarketApplication.java
+│   │   │   │       ├── controller/ProductViewController.java
+│   │   │   │       ├── model/Product.java
+│   │   │   │       ├── repository/ProductRepository.java
+│   │   │   │       └── service/ProductService.java
+│   │   │   └── resources/
+│   │   │       ├── static/
+│   │   │       │   ├── css/styles.css
+│   │   │       │   ├── js/app.js
+│   │   │       │   └── data_minimarket/
+│   │   │       ├── templates/index.html
+│   │   │       └── application.properties
+│   │   └── test/
+│   ├── Dockerfile
+│   └── pom.xml
+├── deploy.sh
+├── docker-compose.yml
 └── README.md
+```
 
+---
 
 ## Dockerization & Cloud Deployment (WEB-2)
 
-This section outlines the process used to containerize the Minimarket application using Docker, publish the image to Docker Hub, and deploy it onto an AWS EC2 instance alongside a PostgreSQL database and a companion service.
+This section outlines the process used to containerize the Minimarket application using Docker, publish the image to Docker Hub, and deploy it onto an AWS EC2 instance alongside a PostgreSQL database, an API Gateway, and a companion service.
 
 ### 1. Local Package Build
 Before building the container image, the application is packaged into an executable `.jar` file using Maven while skipping unit tests for efficiency:
 ```bash
 ./mvnw clean package -DskipTests
+```
+
+### 2. Architecture & API Gateway Integration
+
+To prevent security vulnerabilities and eliminate unnecessary exposed ports:
+- **Zero Exposed Ports for Backend & DB**: Neither the Spring Boot application (port `8080`) nor the PostgreSQL database (port `5432`) expose ports to the public host or external network. Both run isolated inside the internal Docker bridge network (`minimarket_net`).
+- **Nginx API Gateway**: Functions as the single, lightweight secure entry point. It handles incoming traffic, attaches standard security headers (`X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`), and proxies requests internally to `minimarket-app:8080`.
+- **Coexistence on AWS EC2**: Default host port mapping is set to `8082:80` (configurable via `GATEWAY_PORT`) to run seamlessly alongside existing applications on the same EC2 instance without port collisions.
+- **Resource Management**: Memory is constrained with `JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m"` to prevent Out-Of-Memory (OOM) errors in shared EC2 instances.
+
+### 3. AWS S3 Database Provisioning
+
+The database schema and initial product catalog are restored from a SQL dump stored in **AWS S3**:
+1. The EC2 instance downloads the SQL dump from S3 using `aws s3 cp s3://<your-bucket>/minimarket_db.sql ./init.sql`.
+2. Ensure the EC2 instance has an associated **IAM Role** (or configured credentials via `aws configure`) with `s3:GetObject` permissions to allow downloading from S3.
+3. The file `./init.sql` is mounted to `/docker-entrypoint-initdb.d/init.sql:ro` inside the PostgreSQL container, which automatically executes and populates the database on first boot.
+
+### 4. Single-Command Deployment
+
+Run the automated deployment script on the EC2 instance:
+```bash
+chmod +x deploy.sh && ./deploy.sh s3://<your-bucket>/minimarket_db.sql
+```
+
+Alternatively, deploy using standard commands:
+```bash
+# 1. Download database dump from AWS S3
+aws s3 cp s3://<your-bucket>/minimarket_db.sql ./init.sql
+
+# 2. Start container stack in background
+docker compose up -d
+```
